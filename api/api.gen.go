@@ -32,7 +32,7 @@ type GetImageResponse struct {
 type ServerInterface interface {
 	// Получение данных по изображению.
 	// (GET /image/{imageId})
-	GetAuthUser(w http.ResponseWriter, r *http.Request, imageId string)
+	GetImage(w http.ResponseWriter, r *http.Request, imageId string)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -44,8 +44,8 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(http.HandlerFunc) http.HandlerFunc
 
-// GetAuthUser operation middleware
-func (siw *ServerInterfaceWrapper) GetAuthUser(w http.ResponseWriter, r *http.Request) {
+// GetImage operation middleware
+func (siw *ServerInterfaceWrapper) GetImage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var err error
@@ -60,7 +60,7 @@ func (siw *ServerInterfaceWrapper) GetAuthUser(w http.ResponseWriter, r *http.Re
 	}
 
 	var handler = func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAuthUser(w, r, imageId)
+		siw.Handler.GetImage(w, r, imageId)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -184,7 +184,7 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/image/{imageId}", wrapper.GetAuthUser)
+		r.Get(options.BaseURL+"/image/{imageId}", wrapper.GetImage)
 	})
 
 	return r
