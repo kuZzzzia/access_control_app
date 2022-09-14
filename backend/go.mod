@@ -1,4 +1,4 @@
-module access_control_app/backend
+module github.com/kuZzzzia/access_control_app/backend
 
 go 1.18
 

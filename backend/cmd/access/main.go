@@ -2,11 +2,16 @@ package main
 
 import (
 	"context"
+	"errors"
+
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"access_control_app/backend/api"
+	"github.com/go-chi/chi/v5"
+	spesc "github.com/kuZzzzia/access_control_app/api"
+	"github.com/kuZzzzia/access_control_app/backend/api"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -43,7 +48,38 @@ func main() {
 	logger.Info("Waiting for all jobs to stop")
 }
 
-func StartHTTP(ctx context.Context, ctrl *api.Controller) error {
+type Config struct {
+	Address  string `yaml:"address" validate:"required"`
+	BasePath string `yaml:"base_path" validate:"required"`
+}
 
-	return nil
+func StartHTTP(ctx context.Context, ctrl *api.Controller, cfg *Config) error {
+	router := chi.NewRouter()
+
+	// for _, m := range middlewares {
+	// 	router.Use(m)
+	// }
+
+	router.Handle("/", spesc.HandlerFromMuxWithBaseURL(ctrl, router, cfg.BasePath))
+
+	srv := http.Server{
+		Addr:    cfg.Address,
+		Handler: router,
+	}
+
+	group := errgroup.Group{}
+	group.Go(func() error {
+		err := srv.ListenAndServe()
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return err
+		}
+		return nil
+	})
+
+	group.Go(func() error {
+		<-ctx.Done()
+		return srv.Shutdown(ctx)
+	})
+
+	return group.Wait()
 }
