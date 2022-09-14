@@ -19,8 +19,8 @@ type Error struct {
 	Message string  `json:"message"`
 }
 
-// GetImageResponse defines model for GetImageResponse.
-type GetImageResponse struct {
+// GetImageInfoResponse defines model for GetImageInfoResponse.
+type GetImageInfoResponse struct {
 	CreatedAt time.Time `json:"created_at"`
 
 	// Уникальный идентификатор изображения.
@@ -28,11 +28,20 @@ type GetImageResponse struct {
 	PeopleNumber int    `json:"people_number"`
 }
 
+// Ответ на запрос получения изображения по id.
+type GetImageResponse string
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// Получение данных по изображению.
+	// Создание изображения.
+	// (POST /image)
+	CreateImage(w http.ResponseWriter, r *http.Request)
+	// Получение изображения.
 	// (GET /image/{imageId})
 	GetImage(w http.ResponseWriter, r *http.Request, imageId string)
+	// Получение данных по изображению.
+	// (GET /image/{imageId}/info)
+	GetImageInfo(w http.ResponseWriter, r *http.Request, imageId string)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -43,6 +52,21 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.HandlerFunc) http.HandlerFunc
+
+// CreateImage operation middleware
+func (siw *ServerInterfaceWrapper) CreateImage(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var handler = func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateImage(w, r)
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler(w, r.WithContext(ctx))
+}
 
 // GetImage operation middleware
 func (siw *ServerInterfaceWrapper) GetImage(w http.ResponseWriter, r *http.Request) {
@@ -61,6 +85,32 @@ func (siw *ServerInterfaceWrapper) GetImage(w http.ResponseWriter, r *http.Reque
 
 	var handler = func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetImage(w, r, imageId)
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler(w, r.WithContext(ctx))
+}
+
+// GetImageInfo operation middleware
+func (siw *ServerInterfaceWrapper) GetImageInfo(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "imageId" -------------
+	var imageId string
+
+	err = runtime.BindStyledParameter("simple", false, "imageId", chi.URLParam(r, "imageId"), &imageId)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "imageId", Err: err})
+		return
+	}
+
+	var handler = func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetImageInfo(w, r, imageId)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -184,7 +234,13 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/image", wrapper.CreateImage)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/image/{imageId}", wrapper.GetImage)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/image/{imageId}/info", wrapper.GetImageInfo)
 	})
 
 	return r

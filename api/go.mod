@@ -1,4 +1,4 @@
-module university/access_control_app/api
+module access_control_app/api
 
 go 1.18
 

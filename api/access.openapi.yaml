@@ -7,7 +7,7 @@ info:
     name: ИУ9
 
 servers:
-  - url: https://sets.mgtu.ro/api/app/v1
+  - url: https://sets.mgtu.ru/api/app/v1
     description: development server
 
 tags:
@@ -15,7 +15,7 @@ tags:
     description: Операции для работы с изображениями.
 
 paths:
-  /image/{imageId}:
+  /image/{imageId}/info:
     parameters:
       - name: imageId
         in: path
@@ -25,8 +25,8 @@ paths:
           format: uuid
     get:
       tags:
-        - users
-      operationId: getImage
+        - image
+      operationId: getImageInfo
       summary: Получение данных по изображению.
       description: Получение данных по изображению.
       responses:
@@ -35,7 +35,77 @@ paths:
           content:
             application/json:
               schema:
+                $ref: "#/components/schemas/GetImageInfoResponse"
+        '500':
+          description: internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        '401':
+          description: not authorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /image/{imageId}:
+    get:
+      tags:
+        - image
+      operationId: getImage
+      summary: Получение изображения.
+      description: Получение изображения.
+      parameters:
+        - name: imageId
+          in: path
+          description: Идентификатор изображения, которое нужно получить.
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: success
+          content:
+            multipart/formData:
+              schema:
                 $ref: "#/components/schemas/GetImageResponse"
+        '400':
+          description: bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        '500':
+          description: internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        '401':
+          description: not authorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /image:
+    post:
+      tags:
+        - image
+      operationId: createImage
+      summary: Создание изображения.
+      description: Сохраняет снимок текущей обстановки.
+      responses:
+        '200':
+          description: success
+        '400':
+          description: bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         '500':
           description: internal server error
           content:
@@ -64,7 +134,7 @@ components:
         details:
           type: string
 
-    GetImageResponse:
+    GetImageInfoResponse:
       type: object
       required:
         - id
@@ -81,3 +151,8 @@ components:
         people_number:
           type: integer
           minimum: 0
+
+    GetImageResponse:
+      description: Ответ на запрос получения изображения по id.
+      type: string
+      format: binary
