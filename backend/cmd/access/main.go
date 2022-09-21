@@ -3,6 +3,10 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
+	"fmt"
+	"io/ioutil"
+	"log"
 
 	"net/http"
 	"os"
@@ -11,19 +15,39 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/kuZzzzia/access_control_app/backend/api"
-	"github.com/kuZzzzia/access_control_app/specs"
+	"github.com/kuZzzzia/access_control_app/backend/specs"
+	"gopkg.in/yaml.v3"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 
 	"golang.org/x/sync/errgroup"
 )
+
+func Get(fileName string) (Config, error) {
+	var cnf Config
+	data, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		return Config{}, err
+	}
+	err = yaml.Unmarshal(data, &cnf)
+	if err != nil {
+		return Config{}, err
+	}
+	return cnf, nil
+}
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	logger, err := zerolog.Ctx(ctx)
+	logger := zerolog.Ctx(ctx)
+
+	var configPath string
+	flag.StringVar(
+		&configPath, "c", "config.yaml", "Used for set path to config file.")
+	flag.Parse()
+
+	cfg, err := Get(configPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -31,7 +55,7 @@ func main() {
 	group := errgroup.Group{}
 
 	group.Go(func() error {
-		return StartHTTP(ctx, api.NewController())
+		return StartHTTP(ctx, api.NewController(), &cfg)
 	})
 
 	signalListener := make(chan os.Signal, 1)
@@ -44,8 +68,8 @@ func main() {
 		syscall.SIGQUIT)
 
 	stop := <-signalListener
-	logger.Info("Received ", stop)
-	logger.Info("Waiting for all jobs to stop")
+	logger.Info().Msg(fmt.Sprint("Received ", stop))
+	logger.Info().Msg("Waiting for all jobs to stop")
 }
 
 type Config struct {
