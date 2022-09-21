@@ -15,18 +15,25 @@ import (
 
 	"github.com/kuZzzzia/access_control_app/backend/service"
 	"github.com/kuZzzzia/access_control_app/backend/specs"
+	"github.com/kuZzzzia/access_control_app/backend/storage/postgres"
 )
 
 type Controller struct {
-	srv  service.Service
-	repo repo.Repo
+	srv  *service.Service
+	repo *postgres.Repo
 
 	DenyTypes map[string]string
 	SizeLimit int64
 }
 
-func NewController() *Controller {
-	return &Controller{}
+func NewController(srv *service.Service,
+	repo *postgres.Repo,
+	DenyTypes map[string]string,
+	SizeLimit int64) *Controller {
+	return &Controller{
+		srv:  srv,
+		repo: repo,
+	}
 }
 
 var _ specs.ServerInterface = &Controller{}
