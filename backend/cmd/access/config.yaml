@@ -1,0 +1,5 @@
+address: "0.0.0.0:80"
+base_path: "/api/v1"
+postgresql: postgres://POSTGRE_USER:POSTGRE_PASSWORD@POSTGRE_HOST:8453/POSTGRE_DB
+size_limit: ""
+deny_types:
