@@ -1,8 +1,29 @@
 import cv2
 from datetime import datetime
 import threading as th
+from argparse import ArgumentParser
+import websocket
+import json
+import base64
+import requests
 
+req_lock = th.Lock()
+got_req = False
 keep_status = True
+server = ""
+port = ""
+
+def on_message(wsapp, message):
+    with req_lock:
+        got_req = True
+
+wsapp = websocket.WebSocketApp("ws://"+server+":"+port+"/msg", on_message=on_message)
+wsapp.run_forever()
+
+def send(date, count, img):
+    url = "http://"+server+":"+port+"/img"
+    r = requests.post(url, data={'date':date, 'count':count}, files={'img': img})
+
 
 def wait_input():
     global keep_status
@@ -32,15 +53,27 @@ def detect_faces():
             count = len(faces)
 
             #color in BGR format
-            if prev_count != count:
-                for (x, y, w, h) in faces:
-                    cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 255), 1)
-                prev_count = count
-                dt_string = dt.strftime("%d-%m-%Y_%H:%M:%S")
-                name = "./"+dt_string+".jpg"
-                status = cv2.imwrite(name, img)
+            with req_lock:
+                if got_req or prev_count != count:
+                    for (x, y, w, h) in faces:
+                        cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 255), 1)
+                    prev_count = count
+                    dt_str = dt.strftime("%d-%m-%Y_%H:%M:%S")
+                    name = "./"+dt_str+".jpg"
+                    _ = cv2.imwrite(name, img)
+                    send(dt_str, count, open(name, 'rb'))
+                    got_req = False
         frame_count += 1
 
     cap.release()
 
-detect_faces()
+if __name__ == '__main__':
+    parser = ArgumentParser()
+    parser.add_argument("-s", "--server", required=True, help="server address", metavar="s")
+    parser.add_argument("-p", "--port", required=True, help="port", metavar="p")
+
+    args = parser.parse_args()
+    server = args.server
+    port = args.port
+    detect_faces()
+
