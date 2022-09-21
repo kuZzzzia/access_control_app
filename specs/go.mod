@@ -1,4 +1,4 @@
-module github.com/kuZzzzia/access_control_app/api
+module github.com/kuZzzzia/access_control_app/specs
 
 go 1.18
 

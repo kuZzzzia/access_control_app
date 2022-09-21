@@ -10,8 +10,8 @@ import (
 	"syscall"
 
 	"github.com/go-chi/chi/v5"
-	spesc "github.com/kuZzzzia/access_control_app/api"
 	"github.com/kuZzzzia/access_control_app/backend/api"
+	"github.com/kuZzzzia/access_control_app/specs"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -60,7 +60,7 @@ func StartHTTP(ctx context.Context, ctrl *api.Controller, cfg *Config) error {
 	// 	router.Use(m)
 	// }
 
-	router.Handle("/", spesc.HandlerFromMuxWithBaseURL(ctrl, router, cfg.BasePath))
+	router.Handle("/", specs.HandlerFromMuxWithBaseURL(ctrl, router, cfg.BasePath))
 
 	srv := http.Server{
 		Addr:    cfg.Address,

@@ -8,7 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	specs "github.com/kuZzzzia/access_control_app/api"
+	"github.com/kuZzzzia/access_control_app/specs"
 )
 
 type Controller struct {
