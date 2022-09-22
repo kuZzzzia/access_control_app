@@ -119,6 +119,38 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+    get:
+      tags:
+        - image
+      operationId: getLastImage
+      summary: Получение последнее изображения.
+      description: Получение последнее изображения.
+      responses:
+        '200':
+          description: success
+          content:
+            multipart/formData:
+              schema:
+                $ref: "#/components/schemas/GetImageResponse"
+        '400':
+          description: bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        '500':
+          description: internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        '401':
+          description: not authorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 components:
   schemas:
     Error:
@@ -153,6 +185,6 @@ components:
           minimum: 0
 
     GetImageResponse:
-      description: Ответ на запрос получения изображения по id.
+      description: Ответ на запрос получения изображения.
       type: string
       format: binary

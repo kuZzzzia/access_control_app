@@ -81,6 +81,33 @@ func (r Repo) GetObject(ctx context.Context, objectID uuid.UUID) (*service.Image
 
 	return object, nil
 }
+func (r Repo) GetLastObject(ctx context.Context) (*service.ImageInfo, error) {
+	query := `SELECT id, created_at, name, people_number, user_id, extension, size, bucket_name
+			FROM files
+ 			WHERE deleted_at is null
+			ORDER BY created_at desc
+			LIMIT 1`
+
+	rows, err := r.tx.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return nil, service.ErrorObjectNotFound
+	}
+
+	object := &service.ImageInfo{}
+
+	err = rows.Scan(&object.ID, &object.CreatedAt, &object.Name, &object.PeopleNumber, &object.UserID,
+		&object.Extension, &object.Size, &object.BucketName)
+	if err != nil {
+		return nil, err
+	}
+
+	return object, nil
+}
 
 func (r Repo) DeleteObject(ctx context.Context, objectID uuid.UUID) error {
 	deleted_at := time.Now()

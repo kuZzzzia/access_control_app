@@ -191,6 +191,37 @@ func (ctrl *Controller) GetImage(w http.ResponseWriter, r *http.Request, imageId
 }
 
 func (ctrl *Controller) GetImageInfo(w http.ResponseWriter, r *http.Request, imageId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+func (ctrl *Controller) GetLastImage(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	span := trace.FromContext(ctx)
+	defer span.End()
+
+	obj, object, err := ctrl.srv.GetLastObject(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("get object")
+		switch {
+		case errors.As(err, &service.ErrorObjectNotFound):
+			w.WriteHeader(http.StatusNotFound)
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		return
+	}
+	defer obj.Close()
+
+	w.Header().Set("Content-Type", object.ContentType)
+	w.Header().Set("Content-Disposition", "attachment; filename="+object.Name)
+
+	_, err = io.Copy(w, obj)
+	if err != nil {
+		log.Error().Err(err).Msg("return obj")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 }
 
 func withError(ctx context.Context, w http.ResponseWriter, code int, message string) {

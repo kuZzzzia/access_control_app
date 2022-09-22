@@ -28,11 +28,14 @@ type GetImageInfoResponse struct {
 	PeopleNumber int    `json:"people_number"`
 }
 
-// Ответ на запрос получения изображения по id.
+// Ответ на запрос получения изображения.
 type GetImageResponse string
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Получение последнее изображения.
+	// (GET /image)
+	GetLastImage(w http.ResponseWriter, r *http.Request)
 	// Создание изображения.
 	// (POST /image)
 	CreateImage(w http.ResponseWriter, r *http.Request)
@@ -52,6 +55,21 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.HandlerFunc) http.HandlerFunc
+
+// GetLastImage operation middleware
+func (siw *ServerInterfaceWrapper) GetLastImage(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var handler = func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetLastImage(w, r)
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler(w, r.WithContext(ctx))
+}
 
 // CreateImage operation middleware
 func (siw *ServerInterfaceWrapper) CreateImage(w http.ResponseWriter, r *http.Request) {
@@ -233,6 +251,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/image", wrapper.GetLastImage)
+	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/image", wrapper.CreateImage)
 	})

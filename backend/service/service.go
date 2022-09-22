@@ -31,6 +31,7 @@ type ImageInfo struct {
 type Repository interface {
 	CreateObject(ctx context.Context, object *ImageInfo) error
 	GetObject(ctx context.Context, objectID uuid.UUID) (*ImageInfo, error)
+	GetLastObject(ctx context.Context) (*ImageInfo, error)
 	DeleteObject(ctx context.Context, objectID uuid.UUID) error
 }
 
@@ -104,6 +105,19 @@ func (c *Service) GetObjectInfo(ctx context.Context, objectID uuid.UUID) (*Image
 	}
 
 	return object, nil
+}
+
+func (c *Service) GetLastObject(ctx context.Context) (*minio.Object, *ImageInfo, error) {
+	object, err := c.repo.GetLastObject(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get object info %w", err)
+	}
+	obj, err := c.store.GetObject(ctx, object.BucketName, object.ID.String())
+	if err != nil {
+		return nil, nil, fmt.Errorf("get object %w", err)
+	}
+
+	return obj, object, nil
 }
 
 func (c *Service) DeleteObject(ctx context.Context, objectID uuid.UUID) error {
