@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
 
 	"net/http"
 	"os"
@@ -26,7 +25,7 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"gopkg.in/yaml.v3"
 
-	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"golang.org/x/sync/errgroup"
 
@@ -50,8 +49,6 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	logger := zerolog.Ctx(ctx)
-
 	var configPath string
 	flag.StringVar(
 		&configPath, "c", "config.yaml", "Used for set path to config file.")
@@ -59,7 +56,7 @@ func main() {
 
 	cfg, err := Get(configPath)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err)
 	}
 
 	var limit int64
@@ -68,12 +65,12 @@ func main() {
 	}
 	limit, parseLimitErr := units.ParseStrictBytes(cfg.SizeLimitSrt)
 	if parseLimitErr != nil {
-		logger.Fatal().Err(parseLimitErr).Msg("convert limit to bytes")
+		log.Fatal().Err(parseLimitErr).Msg("convert limit to bytes")
 	}
 
 	db, err := CreateConnect(cfg.Connection)
 	if err != nil {
-		log.Fatal(err, ": failed opening connection to sqlite")
+		log.Fatal().Err(err).Msg("failed opening connection to sqlite")
 	}
 
 	minioClient, errMinio := minio.New(cfg.Minio.Address, &minio.Options{
@@ -81,7 +78,7 @@ func main() {
 		Secure: cfg.Minio.SSL,
 	})
 	if errMinio != nil {
-		logger.Fatal().Err(errMinio).Str("address", cfg.Minio.Address).Msg("create minioClient")
+		log.Fatal().Err(errMinio).Str("address", cfg.Minio.Address).Msg("create minioClient")
 	}
 
 	repo := postgres.NewRepository(db)
@@ -113,8 +110,8 @@ func main() {
 		syscall.SIGQUIT)
 
 	stop := <-signalListener
-	logger.Info().Msg(fmt.Sprint("Received ", stop))
-	logger.Info().Msg("Waiting for all jobs to stop")
+	log.Info().Msg(fmt.Sprint("Received ", stop))
+	log.Info().Msg("Waiting for all jobs to stop")
 }
 
 type Config struct {
