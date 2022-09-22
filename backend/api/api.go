@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"mime"
+	"strconv"
 
 	"net/http"
 
@@ -49,7 +50,7 @@ func (ctrl *Controller) CreateImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	file, fileHeader, err := r.FormFile("file")
+	file, fileHeader, err := r.FormFile("img")
 	if err != nil {
 		log.Error().Err(err).Msg("err FormFile")
 		err = r.MultipartForm.RemoveAll()
@@ -69,6 +70,14 @@ func (ctrl *Controller) CreateImage(w http.ResponseWriter, r *http.Request) {
 			log.Error().Err(err).Msg("unable to remove form")
 		}
 	}()
+
+	people_number := r.FormValue("people_number")
+	pn, err := strconv.Atoi(people_number)
+	if err != nil {
+		log.Warn().Err(err).Msg("parse people_number")
+		withError(ctx, w, http.StatusBadRequest, "can't parse people_number")
+		return
+	}
 
 	contentType := fileHeader.Header.Get("Content-Type")
 
@@ -95,7 +104,9 @@ func (ctrl *Controller) CreateImage(w http.ResponseWriter, r *http.Request) {
 	log.Info().Int64("Content-Length", r.ContentLength).Msg("parse Content-Length successful")
 
 	object := &service.ImageInfo{
-		ID:          uuid.New(),
+		ID:           uuid.New(),
+		PeopleNumber: pn,
+
 		ContentType: contentType,
 		Extension:   extension,
 		Size:        fileHeader.Size,
