@@ -30,11 +30,13 @@ type Controller struct {
 
 func NewController(srv *service.Service,
 	repo *postgres.Repo,
-	DenyTypes map[string]string,
-	SizeLimit int64) *Controller {
+	denyTypes map[string]string,
+	sizeLimit int64) *Controller {
 	return &Controller{
-		srv:  srv,
-		repo: repo,
+		srv:       srv,
+		repo:      repo,
+		DenyTypes: denyTypes,
+		SizeLimit: sizeLimit,
 	}
 }
 
