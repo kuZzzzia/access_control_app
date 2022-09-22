@@ -123,8 +123,8 @@ paths:
       tags:
         - image
       operationId: getLastImage
-      summary: Получение последнее изображения.
-      description: Получение последнее изображения.
+      summary: Получение последнего изображения.
+      description: Получение последнего изображения.
       responses:
         '200':
           description: success
