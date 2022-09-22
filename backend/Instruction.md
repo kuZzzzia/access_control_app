@@ -1,6 +1,6 @@
 Запуск posgres
 
-docker run -d -e POSTGRES_PASSWORD=root -e POSTGRES_DATABASE=access-db -e PGADMIN_LISTEN_PORT=6432 -p 6000:5432 --name access-db postgres
+docker run -d -e POSTGRES_PASSWORD=root -e POSTGRES_DATABASE=access-db -e PGADMIN_LISTEN_PORT=6000 -p 6000:5432 --name access-db postgres
 
 Запуск minio
 
