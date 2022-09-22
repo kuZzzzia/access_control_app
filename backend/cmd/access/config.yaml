@@ -1,5 +1,13 @@
-address: "0.0.0.0:80"
+address: "0.0.0.0:8000"
 base_path: "/api/v1"
-postgresql: postgres://POSTGRE_USER:POSTGRE_PASSWORD@POSTGRE_HOST:8453/POSTGRE_DB
-size_limit: ""
+postgresql: postgres://posgres:root@127.0.0.1:6000/access-db
+size_limit: "1GB"
 deny_types:
+
+minio:
+  address: 127.0.0.1:9000
+  access_key_id: "QNQ7CLF8JA5PQR2K6BIO"
+  secret_access_key: "2Gtp1JHkFZdqvVXwhsWLfuVzFDgGTidxhGbPkSBp"
+  use_ssl: true
+  region: "eu-east-1"
+  bucket_id: "6a92f03e-bd1c-4d95-a791-d33dcabfbb05"

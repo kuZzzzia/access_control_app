@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"go.opencensus.io/trace"
 
 	"github.com/kuZzzzia/access_control_app/backend/service"
@@ -40,20 +41,20 @@ var _ specs.ServerInterface = &Controller{}
 
 func (ctrl *Controller) CreateImage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	entry := zerolog.Ctx(ctx)
 	var err error
 
 	if r.Body == nil {
-		entry.Warn().Msg("nil body")
+		log.Warn().Msg("nil body")
 		withError(ctx, w, http.StatusBadRequest, "nil body")
 		return
 	}
 
 	file, fileHeader, err := r.FormFile("file")
 	if err != nil {
+		log.Error().Err(err).Msg("err FormFile")
 		err = r.MultipartForm.RemoveAll()
 		if err != nil {
-			entry.Error().Err(err).Msg("unable to remove form")
+			log.Error().Err(err).Msg("unable to remove form")
 		}
 		withError(ctx, w, http.StatusBadRequest, "form file 'upfile' not found")
 		return
@@ -61,11 +62,11 @@ func (ctrl *Controller) CreateImage(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		errClose := file.Close()
 		if errClose != nil {
-			entry.Error().Err(errClose).Msg("unable to close form file")
+			log.Error().Err(errClose).Msg("unable to close form file")
 		}
 		err = r.MultipartForm.RemoveAll()
 		if err != nil {
-			entry.Error().Err(err).Msg("unable to remove form")
+			log.Error().Err(err).Msg("unable to remove form")
 		}
 	}()
 
@@ -73,7 +74,7 @@ func (ctrl *Controller) CreateImage(w http.ResponseWriter, r *http.Request) {
 
 	mt, _, err := mime.ParseMediaType(contentType)
 	if err != nil {
-		entry.Warn().Err(err).Msg("parse media type")
+		log.Warn().Err(err).Msg("parse media type")
 		withError(ctx, w, http.StatusBadRequest, "can't parse media type")
 		return
 	}
@@ -86,12 +87,12 @@ func (ctrl *Controller) CreateImage(w http.ResponseWriter, r *http.Request) {
 
 	// bytes
 	if r.ContentLength <= 0 || r.ContentLength > ctrl.SizeLimit {
-		entry.Warn().Int64("Content-Length", r.ContentLength).Int64("max size limit", ctrl.SizeLimit).
+		log.Warn().Int64("Content-Length", r.ContentLength).Int64("max size limit", ctrl.SizeLimit).
 			Msg("incorrect Content-Length")
 		withError(ctx, w, http.StatusBadRequest, "incorrect Content-Length")
 		return
 	}
-	entry.Info().Int64("Content-Length", r.ContentLength).Msg("parse Content-Length successful")
+	log.Info().Int64("Content-Length", r.ContentLength).Msg("parse Content-Length successful")
 
 	object := &service.ImageInfo{
 		ID:          uuid.New(),
@@ -109,7 +110,7 @@ func (ctrl *Controller) CreateImage(w http.ResponseWriter, r *http.Request) {
 
 	repo, err := ctrl.repo.BeginTx(ctx)
 	if err != nil {
-		entry.Error().Err(err).Msg("begin tx")
+		log.Error().Err(err).Msg("begin tx")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -120,14 +121,14 @@ func (ctrl *Controller) CreateImage(w http.ResponseWriter, r *http.Request) {
 
 	err = objectService.CreateObject(ctx, file, object)
 	if err != nil {
-		entry.Error().Err(err).Msg("create object")
+		log.Error().Err(err).Msg("create object")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	err = repo.Commit()
 	if err != nil {
-		entry.Error().Err(err).Msg("commit")
+		log.Error().Err(err).Msg("commit")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -136,7 +137,7 @@ func (ctrl *Controller) CreateImage(w http.ResponseWriter, r *http.Request) {
 
 	res, err := ctrl.srv.GetObjectInfo(ctx, object.ID)
 	if err != nil {
-		entry.Error().Err(err).Msg("return resume info")
+		log.Error().Err(err).Msg("return resume info")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
