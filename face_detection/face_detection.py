@@ -1,3 +1,4 @@
+import re
 import cv2
 from datetime import datetime
 import threading as th
@@ -13,6 +14,7 @@ server = ""
 port = ""
 
 def on_message(wsapp, message):
+    global req_lock, got_req
     with req_lock:
         got_req = True
 
@@ -20,7 +22,7 @@ wsapp = websocket.WebSocketApp("ws://"+server+":"+port+"/msg", on_message=on_mes
 wsapp.run_forever()
 
 def send(date, count, img):
-    url = "http://"+server+":"+port+"/img"
+    url = "http://"+server+":"+port+"/api/image"
     r = requests.post(url, data={'created_at':date, 'people_number':count}, files={'img': img})
 
 
@@ -30,6 +32,7 @@ def wait_input():
     keep_status = False
 
 def detect_faces():
+    global req_lock, got_req
     face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 
     cap = cv2.VideoCapture(0)
