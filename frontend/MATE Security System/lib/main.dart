@@ -1,8 +1,9 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 void main() {
   runApp(const MyApp());
@@ -34,18 +35,29 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  Random random = Random();
-  int randomNumber = 0;
   late DateTime initialTime;
   late final Timer timer;
   Duration elapsed = Duration.zero;
   String elapsedString = "0";
-  String status = "OK";
-  Color? statusColor = Colors.green[200];
+  String status = "ER";
+  Color? statusColor = Colors.red[200];
+  final ConnectivityResult connectionStatus = ConnectivityResult.none;
+  final Connectivity connectivity = Connectivity();
+  late StreamSubscription<ConnectivityResult> connectivitySubscription;
+  late CachedNetworkImage image;
+  ConnectivityResult connection = ConnectivityResult.none;
+  int amount = 1;
+  double width = 370;
+  double height = 210;
 
   @override
   void initState() {
     super.initState();
+    connectivitySubscription =
+        connectivity.onConnectivityChanged.listen((ConnectivityResult result) {
+          connection = result;
+        });
+    _refreshPicture();
     initialTime = DateTime.now();
     timer = Timer.periodic(const Duration(minutes: 1), (_)
     {
@@ -63,17 +75,17 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _refreshPicture() {
     setState(() {
-      randomNumber = random.nextInt(99);
-      initialTime = DateTime.now();
-      elapsed = Duration.zero;
-      elapsedString = "0";
-      if (randomNumber < 50) {
-        status = "OK";
-        statusColor = Colors.green[200];
-      } else {
-        status = "ER";
-        statusColor = Colors.red[200];
-      }
+        if (connection != ConnectivityResult.none) {
+          amount++;
+          status = "OK";
+          statusColor = Colors.green[200];
+          initialTime = DateTime.now();
+          elapsed = Duration.zero;
+          elapsedString = "0";
+        } else {
+          status = "ER";
+          statusColor = Colors.red[200];
+        }
     });
   }
 
@@ -94,10 +106,10 @@ class _MyHomePageState extends State<MyHomePage> {
                           decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(20)),
                           child: Stack(
                               children: <Widget>[
-                          const SizedBox(width: 370, height: 248, child: Center(child:CircularProgressIndicator(strokeWidth: 4))),
+                                SizedBox(width: width, height: height, child: const Center(child:CircularProgressIndicator(strokeWidth: 4))),
                           ClipRRect(
                             borderRadius: BorderRadius.circular(20),
-                            child : Image.network('https://source.unsplash.com/random/1080x720?sig=$randomNumber', width: 370, height: 248),
+                            child : CachedNetworkImage(imageUrl: 'http://82.146.33.179:8000/api/image/$amount', width: width, height: height),
                           )])),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -130,7 +142,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                 color: Colors.brown[200],
                                 shape: BoxShape.circle,
                               ),
-                              child: Center(widthFactor: 2.7, heightFactor: 1.4, child: Text(randomNumber.toString(), style: const TextStyle(fontSize: 40))),
+                              child: Center(widthFactor: 2.7, heightFactor: 1.4, child: Text(amount.toString(), style: const TextStyle(fontSize: 40))),
                             )
                         ),
                             ]),
