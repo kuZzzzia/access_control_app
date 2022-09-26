@@ -16,7 +16,7 @@ type Minio struct {
 	SSLStr          string `yaml:"ssl_string"`
 	SSL             bool   `yaml:"use_ssl"`
 	Region          string `yaml:"region"`
-	BucketID        string `yaml:"bucket"`
+	BucketID        string `yaml:"bucket_id"`
 }
 
 type ObjectStorage struct {
