@@ -1,4 +1,3 @@
-import re
 import cv2
 from datetime import datetime
 import threading as th
@@ -6,6 +5,7 @@ from argparse import ArgumentParser
 import websocket
 import requests
 import os
+from requests_toolbelt.multipart.encoder import MultipartEncoder
 
 req_lock = th.Lock()
 got_req = False
@@ -18,12 +18,17 @@ def on_message(wsapp, message):
     with req_lock:
         got_req = True
 
-wsapp = websocket.WebSocketApp("ws://"+server+":"+port+"/msg", on_message=on_message)
-wsapp.run_forever()
-
-def send(date, count, img):
-    url = "http://"+server+":"+port+"/api/image"
-    r = requests.post(url, data={'created_at':date, 'people_number':count}, files={'img': img})
+def send(date, count, filename):
+    mp_encoder = MultipartEncoder(
+    fields={
+        'created_at':date, 
+        'people_number':count,
+        'img': (filename, open(filename+'.jpg', 'rb'), 'image/jpg'),
+    }
+)
+    url = "http://"+server+":"+port+"/api/v1/image"
+    r = requests.post(url, data=mp_encoder, headers={'Content-Type': mp_encoder.content_type})
+    r.text
 
 
 def wait_input():
@@ -63,7 +68,7 @@ def detect_faces():
                     dt_str = dt.strftime("%d-%m-%Y_%H:%M:%S")
                     name = "./"+dt_str+".jpg"
                     _ = cv2.imwrite(name, img)
-                    send(dt_str, people_amount, open(name, 'rb'))
+                    send(dt_str, str(people_amount), dt_str)
                     os.remove(name)
                     got_req = False
         frame_count += 1
