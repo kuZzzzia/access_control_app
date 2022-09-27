@@ -30,19 +30,19 @@ paths:
       summary: Получение данных по изображению.
       description: Получение данных по изображению.
       responses:
-        '200':
+        "200":
           description: Успешный ответ.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/GetImageInfoResponse"
-        '500':
+        "500":
           description: internal server error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-        '401':
+        "401":
           description: not authorized
           content:
             application/json:
@@ -50,40 +50,69 @@ paths:
                 $ref: "#/components/schemas/Error"
 
   /image/{imageId}:
+    parameters:
+      - name: imageId
+        in: path
+        description: Идентификатор изображения.
+        required: true
+        schema:
+          type: string
+          format: uuid
+
     get:
       tags:
         - image
       operationId: getImage
       summary: Получение изображения.
       description: Получение изображения.
-      parameters:
-        - name: imageId
-          in: path
-          description: Идентификатор изображения, которое нужно получить.
-          required: true
-          schema:
-            type: string
-            format: uuid
       responses:
-        '200':
+        "200":
           description: success
           content:
             multipart/formData:
               schema:
                 $ref: "#/components/schemas/GetImageResponse"
-        '400':
+        "400":
           description: bad request
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-        '500':
+        "500":
           description: internal server error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-        '401':
+        "401":
+          description: not authorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      tags:
+        - image
+      operationId: deleteImage
+      summary: Удаление изображения.
+      description: Удаление изображения.
+      responses:
+        "200":
+          description: success
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
           description: not authorized
           content:
             application/json:
@@ -98,21 +127,25 @@ paths:
       summary: Создание изображения.
       description: Сохраняет снимок текущей обстановки.
       responses:
-        '200':
-          description: success
-        '400':
+        "200":
+          description: Успешный ответ.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetImageInfoResponse"
+        "400":
           description: bad request
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-        '500':
+        "500":
           description: internal server error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-        '401':
+        "401":
           description: not authorized
           content:
             application/json:
@@ -126,30 +159,67 @@ paths:
       summary: Получение последнего изображения.
       description: Получение последнего изображения.
       responses:
-        '200':
+        "200":
           description: success
           content:
             multipart/formData:
               schema:
                 $ref: "#/components/schemas/GetImageResponse"
-        '400':
+        "400":
           description: bad request
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-        '500':
+        "500":
           description: internal server error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-        '401':
+        "401":
           description: not authorized
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+
+    delete:
+      tags:
+        - image
+      operationId: deleteOldImages
+      summary: Удаление изображений старше определенной даты.
+      description: Удаление изображений старше определенной даты.
+      parameters:
+        - name: created_at
+          in: query
+          required: true
+          description: Дата создания, до которой нужно удалить изображения.
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: success
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: not authorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 
 components:
   schemas:
