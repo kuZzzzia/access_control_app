@@ -237,6 +237,14 @@ func (ctrl *Controller) GetLastImage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (ctrl *Controller) DeleteImage(w http.ResponseWriter, r *http.Request, imageId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+func (ctrl *Controller) DeleteOldImages(w http.ResponseWriter, r *http.Request, params specs.DeleteOldImagesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 func withError(ctx context.Context, w http.ResponseWriter, code int, message string) {
 	resp := specs.Error{
 		Code:    code,

@@ -31,14 +31,26 @@ type GetImageInfoResponse struct {
 // Ответ на запрос получения изображения.
 type GetImageResponse string
 
+// DeleteOldImagesParams defines parameters for DeleteOldImages.
+type DeleteOldImagesParams struct {
+	// Дата создания, до которой нужно удалить изображения.
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// Получение последнее изображения.
+	// Удаление изображений старше определенной даты.
+	// (DELETE /image)
+	DeleteOldImages(w http.ResponseWriter, r *http.Request, params DeleteOldImagesParams)
+	// Получение последнего изображения.
 	// (GET /image)
 	GetLastImage(w http.ResponseWriter, r *http.Request)
 	// Создание изображения.
 	// (POST /image)
 	CreateImage(w http.ResponseWriter, r *http.Request)
+	// Удаление изображения.
+	// (DELETE /image/{imageId})
+	DeleteImage(w http.ResponseWriter, r *http.Request, imageId string)
 	// Получение изображения.
 	// (GET /image/{imageId})
 	GetImage(w http.ResponseWriter, r *http.Request, imageId string)
@@ -55,6 +67,40 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.HandlerFunc) http.HandlerFunc
+
+// DeleteOldImages operation middleware
+func (siw *ServerInterfaceWrapper) DeleteOldImages(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteOldImagesParams
+
+	// ------------- Required query parameter "created_at" -------------
+	if paramValue := r.URL.Query().Get("created_at"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "created_at"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "created_at", r.URL.Query(), &params.CreatedAt)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "created_at", Err: err})
+		return
+	}
+
+	var handler = func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteOldImages(w, r, params)
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler(w, r.WithContext(ctx))
+}
 
 // GetLastImage operation middleware
 func (siw *ServerInterfaceWrapper) GetLastImage(w http.ResponseWriter, r *http.Request) {
@@ -77,6 +123,32 @@ func (siw *ServerInterfaceWrapper) CreateImage(w http.ResponseWriter, r *http.Re
 
 	var handler = func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateImage(w, r)
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler(w, r.WithContext(ctx))
+}
+
+// DeleteImage operation middleware
+func (siw *ServerInterfaceWrapper) DeleteImage(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "imageId" -------------
+	var imageId string
+
+	err = runtime.BindStyledParameter("simple", false, "imageId", chi.URLParam(r, "imageId"), &imageId)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "imageId", Err: err})
+		return
+	}
+
+	var handler = func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteImage(w, r, imageId)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -252,10 +324,16 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/image", wrapper.DeleteOldImages)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/image", wrapper.GetLastImage)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/image", wrapper.CreateImage)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/image/{imageId}", wrapper.DeleteImage)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/image/{imageId}", wrapper.GetImage)

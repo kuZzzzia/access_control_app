@@ -220,7 +220,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-
 components:
   schemas:
     Error:
