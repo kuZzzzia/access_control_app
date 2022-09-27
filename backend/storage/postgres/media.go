@@ -50,7 +50,7 @@ func (r Repo) CreateObject(ctx context.Context, object *service.ImageInfo) error
 
 	createObjectQuery := `INSERT INTO files
 		(id, created_at, name, people_number, user_id, extension, size, bucket_name)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)`
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
 
 	_, err := r.tx.ExecContext(ctx, createObjectQuery, args...)
 	return err
