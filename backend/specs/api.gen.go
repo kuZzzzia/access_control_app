@@ -12,6 +12,12 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// Изображение на загрузку.
+type CreateImagePayload struct {
+	Img          *string `json:"img,omitempty"`
+	PeopleNumber *int    `json:"people_number,omitempty"`
+}
+
 // Error defines model for Error.
 type Error struct {
 	Code    int     `json:"code"`
@@ -29,7 +35,10 @@ type GetImageInfoResponse struct {
 }
 
 // Ответ на запрос получения изображения.
-type GetImageResponse string
+type GetImageResponse struct {
+	Img  *string               `json:"img,omitempty"`
+	Info *GetImageInfoResponse `json:"info,omitempty"`
+}
 
 // DeleteOldImagesParams defines parameters for DeleteOldImages.
 type DeleteOldImagesParams struct {

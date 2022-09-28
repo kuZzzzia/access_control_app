@@ -126,6 +126,13 @@ paths:
       operationId: createImage
       summary: Создание изображения.
       description: Сохраняет снимок текущей обстановки.
+      requestBody:
+        description: Изображение, которое нужно загрузить.
+        required: true
+        content:
+          multipart/formData:
+            schema:
+              $ref: "#/components/schemas/CreateImagePayload"
       responses:
         "200":
           description: Успешный ответ.
@@ -255,5 +262,20 @@ components:
 
     GetImageResponse:
       description: Ответ на запрос получения изображения.
-      type: string
-      format: binary
+      type: object
+      properties:
+        img:
+          type: string
+          format: binary
+        info:
+          $ref: "#/components/schemas/GetImageInfoResponse"
+
+    CreateImagePayload:
+      description: Изображение на загрузку.
+      type: object
+      properties:
+        img:
+          type: string
+          format: binary
+        people_number:
+          type: integer

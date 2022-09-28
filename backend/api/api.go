@@ -1,11 +1,13 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"mime"
+	"mime/multipart"
 	"strconv"
 
 	"net/http"
@@ -226,10 +228,40 @@ func (ctrl *Controller) GetLastImage(w http.ResponseWriter, r *http.Request) {
 	}
 	defer obj.Close()
 
-	w.Header().Set("Content-Type", object.ContentType)
-	w.Header().Set("Content-Disposition", "attachment; filename="+object.Name)
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	fw, err := writer.CreateFormField("info")
+	if err != nil {
+		log.Error().Err(err).Msg("CreateFormFile info")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
-	_, err = io.Copy(w, obj)
+	err = json.NewEncoder(fw).Encode(GetImageForResponse(object))
+	if err != nil {
+		log.Error().Err(err).Msg("json encode object")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	fw, err = writer.CreateFormFile("img", object.Name)
+	if err != nil {
+		log.Error().Err(err).Msg("createFormFile img")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	_, err = io.Copy(fw, obj)
+	if err != nil {
+		log.Error().Err(err).Msg("copy obj")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	writer.Close()
+
+	w.Header().Set("Content-Type", writer.FormDataContentType())
+	_, err = io.Copy(w, body)
 	if err != nil {
 		log.Error().Err(err).Msg("return obj")
 		w.WriteHeader(http.StatusInternalServerError)
