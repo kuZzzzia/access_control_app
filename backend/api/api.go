@@ -418,6 +418,10 @@ func (ctrl *Controller) DeleteOldImages(w http.ResponseWriter, r *http.Request, 
 	return
 }
 
+func (ctrl *Controller) ListObjectInfo(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 func withError(ctx context.Context, w http.ResponseWriter, code int, message string) {
 	resp := specs.Error{
 		Code:    code,
