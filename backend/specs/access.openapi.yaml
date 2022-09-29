@@ -1,0 +1,324 @@
+openapi: 3.0.3
+info:
+  title: Access Control API
+  version: 1.0.0
+  description: API ...
+  contact:
+    name: ИУ9
+
+servers:
+  - url: https://127.0.0.1:8000/api/v1
+    description: development server
+
+tags:
+  - name: image
+    description: Операции для работы с изображениями.
+
+paths:
+  /image:
+    post:
+      tags:
+        - image
+      operationId: createImage
+      summary: Создание изображения.
+      description: Сохраняет снимок текущей обстановки.
+      requestBody:
+        description: Изображение, которое нужно загрузить.
+        required: true
+        content:
+          multipart/formData:
+            schema:
+              $ref: "#/components/schemas/CreateImagePayload"
+      responses:
+        "200":
+          description: Успешный ответ.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetImageInfoResponse"
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: not authorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    get:
+      tags:
+        - image
+      operationId: getLastImage
+      summary: Получение последнего изображения.
+      description: Получение последнего изображения.
+      responses:
+        "200":
+          description: success
+          content:
+            multipart/formData:
+              schema:
+                $ref: "#/components/schemas/GetImageResponse"
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: not authorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /image/{imageId}/info:
+    parameters:
+      - name: imageId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags:
+        - image
+      operationId: getImageInfo
+      summary: Получение данных по изображению.
+      description: Получение данных по изображению.
+      responses:
+        "200":
+          description: Успешный ответ.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetImageInfoResponse"
+        "500":
+          description: internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: not authorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /image/{imageId}:
+    parameters:
+      - name: imageId
+        in: path
+        description: Идентификатор изображения.
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      tags:
+        - image
+      operationId: getImage
+      summary: Получение изображения.
+      description: Получение изображения.
+      responses:
+        "200":
+          description: success
+          content:
+            multipart/formData:
+              schema:
+                $ref: "#/components/schemas/GetImageResponse"
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: not authorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      tags:
+        - image
+      operationId: deleteImage
+      summary: Удаление изображения.
+      description: Удаление изображения.
+      responses:
+        "200":
+          description: success
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: not authorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /images/info:
+    get:
+      tags:
+        - image
+      operationId: listObjectInfo
+      summary: Получение списка информации об изображениях.
+      # TODO: Not Implemented, неплохо бы добавить пагинацию
+      description: Получение списка информации об изображениях.
+      responses:
+        '200':
+          description: Успешный ответ.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListObjectsInfoResponse"
+        '500':
+          description: internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        '401':
+          description: not authorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /images:
+    delete:
+      tags:
+        - image
+      operationId: deleteOldImages
+      summary: Удаление изображений старше определенной даты.
+      description: Удаление изображений старше определенной даты.
+      parameters:
+        - name: created_at
+          in: query
+          required: true
+          description: Дата создания, до которой нужно удалить изображения.
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: success
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: not authorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  schemas:
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        details:
+          type: string
+
+    GetImageInfoResponse:
+      type: object
+      required:
+        - id
+        - created_at
+        - people_number
+      properties:
+        id:
+          type: string
+          description: Уникальный идентификатор изображения.
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        people_number:
+          type: integer
+          minimum: 0
+
+    GetImageResponse:
+      description: Ответ на запрос получения изображения.
+      type: object
+      properties:
+        img:
+          type: string
+          format: binary
+        info:
+          $ref: "#/components/schemas/GetImageInfoResponse"
+
+    CreateImagePayload:
+      description: Изображение на загрузку.
+      type: object
+      properties:
+        img:
+          type: string
+          format: binary
+        created_at:
+          type: string
+          format: date-time
+        people_number:
+          type: integer
+
+    ListObjectsInfoResponse:
+      type: object
+      description: Ответ на запрос на получение списка информации об изображениях.
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/GetImageInfoResponse"

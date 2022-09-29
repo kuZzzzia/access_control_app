@@ -1,4 +1,0 @@
-generate:
-  - types
-  - chi-server
-  - skip-prune
