@@ -9,10 +9,12 @@ import (
 	"mime"
 	"mime/multipart"
 	"strconv"
+	"time"
 
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/minio/minio-go/v7"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"go.opencensus.io/trace"
@@ -43,6 +45,8 @@ func NewController(srv *service.Service,
 }
 
 var _ specs.ServerInterface = &Controller{}
+
+const layout = "02-01-2006_15:04:05"
 
 func (ctrl *Controller) CreateImage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -83,6 +87,14 @@ func (ctrl *Controller) CreateImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	createdAt := r.FormValue("created_at")
+	createdAtTime, err := time.Parse(createdAt, layout)
+	if err != nil {
+		log.Warn().Err(err).Msg("parse created_at")
+		withError(ctx, w, http.StatusBadRequest, "can't parse created_at")
+		return
+	}
+
 	contentType := fileHeader.Header.Get("Content-Type")
 
 	mt, _, err := mime.ParseMediaType(contentType)
@@ -108,7 +120,9 @@ func (ctrl *Controller) CreateImage(w http.ResponseWriter, r *http.Request) {
 	log.Info().Int64("Content-Length", r.ContentLength).Msg("parse Content-Length successful")
 
 	object := &service.ImageInfo{
-		ID:           uuid.New(),
+		ID:        uuid.New(),
+		CreatedAt: createdAtTime,
+
 		PeopleNumber: pn,
 
 		ContentType: contentType,
@@ -172,88 +186,33 @@ func (ctrl *Controller) GetImage(w http.ResponseWriter, r *http.Request, imageId
 
 	span := trace.FromContext(ctx)
 	defer span.End()
-	entry := zerolog.Ctx(ctx)
 
 	objectID, err := uuid.Parse(imageId)
 	if err != nil {
-		entry.Warn().Err(err).Msg("invalid uuid")
-		withError(ctx, w, http.StatusBadRequest, "invalid process_code")
+		log.Warn().Err(err).Msg("invalid uuid")
+		withError(ctx, w, http.StatusBadRequest, "invalid image id")
 		return
 	}
 
-	obj, object, err := ctrl.srv.GetObject(ctx, objectID)
-	if err != nil {
-		entry.Error().Err(err).Msg("get object")
-		switch {
-		case errors.As(err, &service.ErrorObjectNotFound):
-			w.WriteHeader(http.StatusNotFound)
-		default:
-			w.WriteHeader(http.StatusInternalServerError)
-		}
-		return
-	}
-	defer obj.Close()
-
-	w.Header().Set("Content-Type", object.ContentType)
-	w.Header().Set("Content-Disposition", "attachment; filename="+object.Name)
-
-	_, err = io.Copy(w, obj)
-	if err != nil {
-		entry.Error().Err(err).Msg("return obj")
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-}
-
-func (ctrl *Controller) GetImageInfo(w http.ResponseWriter, r *http.Request, imageId string) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-func (ctrl *Controller) GetLastImage(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	span := trace.FromContext(ctx)
-	defer span.End()
-
-	obj, object, err := ctrl.srv.GetLastObject(ctx)
+	file, object, err := ctrl.srv.GetObject(ctx, objectID)
 	if err != nil {
 		log.Error().Err(err).Msg("get object")
 		switch {
 		case errors.As(err, &service.ErrorObjectNotFound):
-			w.WriteHeader(http.StatusNotFound)
+			withError(ctx, w, http.StatusNotFound, "object not found")
 		default:
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 		return
 	}
-	defer obj.Close()
+	defer file.Close()
 
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
-	fw, err := writer.CreateFormField("info")
-	if err != nil {
-		log.Error().Err(err).Msg("CreateFormFile info")
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
 
-	err = json.NewEncoder(fw).Encode(GetImageForResponse(object))
+	writer, err = createMiltuPartImage(writer, file, object)
 	if err != nil {
-		log.Error().Err(err).Msg("json encode object")
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	fw, err = writer.CreateFormFile("img", object.Name)
-	if err != nil {
-		log.Error().Err(err).Msg("createFormFile img")
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	_, err = io.Copy(fw, obj)
-	if err != nil {
-		log.Error().Err(err).Msg("copy obj")
+		writer.Close()
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -269,12 +228,194 @@ func (ctrl *Controller) GetLastImage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (ctrl *Controller) GetImageInfo(w http.ResponseWriter, r *http.Request, imageId string) {
+	ctx := r.Context()
+
+	span := trace.FromContext(ctx)
+	defer span.End()
+	entry := zerolog.Ctx(ctx)
+
+	objectID, err := uuid.Parse(imageId)
+	if err != nil {
+		entry.Warn().Err(err).Msg("invalid uuid")
+		withError(ctx, w, http.StatusBadRequest, "invalid image id")
+		return
+	}
+
+	object, err := ctrl.srv.GetObjectInfo(ctx, objectID)
+	if err != nil {
+		entry.Error().Err(err).Msg("get object")
+		switch {
+		case errors.As(err, &service.ErrorObjectNotFound):
+			withError(ctx, w, http.StatusNotFound, "object not found")
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		return
+	}
+
+	withJSON(ctx, w, http.StatusOK, GetImageForResponse(object))
+}
+
+func (ctrl *Controller) GetLastImage(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	span := trace.FromContext(ctx)
+	defer span.End()
+
+	file, object, err := ctrl.srv.GetLastObject(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("get object")
+		switch {
+		case errors.As(err, &service.ErrorObjectNotFound):
+			withError(ctx, w, http.StatusNotFound, "object not found")
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		return
+	}
+	defer file.Close()
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	writer, err = createMiltuPartImage(writer, file, object)
+	if err != nil {
+		writer.Close()
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	writer.Close()
+
+	w.Header().Set("Content-Type", writer.FormDataContentType())
+	_, err = io.Copy(w, body)
+	if err != nil {
+		log.Error().Err(err).Msg("return obj")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+}
+
+func createMiltuPartImage(writer *multipart.Writer, file *minio.Object, object *service.ImageInfo) (*multipart.Writer, error) {
+	fw, err := writer.CreateFormField("info")
+	if err != nil {
+		log.Error().Err(err).Msg("CreateFormFile info")
+
+	}
+
+	err = json.NewEncoder(fw).Encode(GetImageForResponse(object))
+	if err != nil {
+		log.Error().Err(err).Msg("json encode object")
+		return writer, err
+	}
+
+	fw, err = writer.CreateFormFile("img", object.Name)
+	if err != nil {
+		log.Error().Err(err).Msg("createFormFile img")
+		return writer, err
+	}
+
+	_, err = io.Copy(fw, file)
+	if err != nil {
+		log.Error().Err(err).Msg("copy obj")
+		return writer, err
+	}
+
+	return writer, nil
+}
+
 func (ctrl *Controller) DeleteImage(w http.ResponseWriter, r *http.Request, imageId string) {
-	w.WriteHeader(http.StatusNotImplemented)
+	ctx := r.Context()
+
+	span := trace.FromContext(ctx)
+	defer span.End()
+	entry := zerolog.Ctx(ctx)
+
+	objectID, err := uuid.Parse(imageId)
+	if err != nil {
+		entry.Warn().Err(err).Msg("invalid uuid")
+		withError(ctx, w, http.StatusBadRequest, "invalid image id")
+		return
+	}
+
+	repo, err := ctrl.repo.BeginTx(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("begin tx")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	shouldRollback := true
+	defer repo.Rollback(ctx, &shouldRollback)
+
+	objectService := ctrl.srv.WithNewRepo(repo)
+
+	err = objectService.DeleteObject(ctx, objectID)
+	if err != nil {
+		entry.Error().Err(err).Msg("get object")
+		switch {
+		case errors.As(err, &service.ErrorObjectNotFound):
+			withError(ctx, w, http.StatusNotFound, "object not found")
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		return
+	}
+
+	err = repo.Commit()
+	if err != nil {
+		log.Error().Err(err).Msg("commit")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	shouldRollback = false
+
+	w.WriteHeader(http.StatusOK)
+	return
 }
 
 func (ctrl *Controller) DeleteOldImages(w http.ResponseWriter, r *http.Request, params specs.DeleteOldImagesParams) {
-	w.WriteHeader(http.StatusNotImplemented)
+	ctx := r.Context()
+
+	span := trace.FromContext(ctx)
+	defer span.End()
+	entry := zerolog.Ctx(ctx)
+
+	repo, err := ctrl.repo.BeginTx(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("begin tx")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	shouldRollback := true
+	defer repo.Rollback(ctx, &shouldRollback)
+
+	objectService := ctrl.srv.WithNewRepo(repo)
+
+	err = objectService.DeleteObjects(ctx, params.CreatedAt)
+	if err != nil {
+		entry.Error().Err(err).Msg("get object")
+		switch {
+		case errors.As(err, &service.ErrorObjectNotFound):
+			withError(ctx, w, http.StatusNotFound, "object not found")
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		return
+	}
+
+	err = repo.Commit()
+	if err != nil {
+		log.Error().Err(err).Msg("commit")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	shouldRollback = false
+
+	w.WriteHeader(http.StatusOK)
+	return
 }
 
 func withError(ctx context.Context, w http.ResponseWriter, code int, message string) {

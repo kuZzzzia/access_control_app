@@ -7,7 +7,7 @@ info:
     name: ИУ9
 
 servers:
-  - url: https://sets.mgtu.ru/api/app/v1
+  - url: https://127.0.0.1:8000/api/v1
     description: development server
 
 tags:
@@ -15,6 +15,78 @@ tags:
     description: Операции для работы с изображениями.
 
 paths:
+  /image:
+    post:
+      tags:
+        - image
+      operationId: createImage
+      summary: Создание изображения.
+      description: Сохраняет снимок текущей обстановки.
+      requestBody:
+        description: Изображение, которое нужно загрузить.
+        required: true
+        content:
+          multipart/formData:
+            schema:
+              $ref: "#/components/schemas/CreateImagePayload"
+      responses:
+        "200":
+          description: Успешный ответ.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetImageInfoResponse"
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: not authorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    get:
+      tags:
+        - image
+      operationId: getLastImage
+      summary: Получение последнего изображения.
+      description: Получение последнего изображения.
+      responses:
+        "200":
+          description: success
+          content:
+            multipart/formData:
+              schema:
+                $ref: "#/components/schemas/GetImageResponse"
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: not authorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /image/{imageId}/info:
     parameters:
       - name: imageId
@@ -119,78 +191,35 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /image:
-    post:
+  /images/info:
+    get:
       tags:
         - image
-      operationId: createImage
-      summary: Создание изображения.
-      description: Сохраняет снимок текущей обстановки.
-      requestBody:
-        description: Изображение, которое нужно загрузить.
-        required: true
-        content:
-          multipart/formData:
-            schema:
-              $ref: "#/components/schemas/CreateImagePayload"
+      operationId: listObjectInfo
+      summary: Получение списка информации об изображениях.
+      # TODO: Not Implemented, неплохо бы добавить пагинацию
+      description: Получение списка информации об изображениях.
       responses:
-        "200":
+        '200':
           description: Успешный ответ.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/GetImageInfoResponse"
-        "400":
-          description: bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "500":
+                $ref: "#/components/schemas/ListObjectsInfoResponse"
+        '500':
           description: internal server error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-        "401":
+        '401':
           description: not authorized
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
 
-    get:
-      tags:
-        - image
-      operationId: getLastImage
-      summary: Получение последнего изображения.
-      description: Получение последнего изображения.
-      responses:
-        "200":
-          description: success
-          content:
-            multipart/formData:
-              schema:
-                $ref: "#/components/schemas/GetImageResponse"
-        "400":
-          description: bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "500":
-          description: internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: not authorized
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
+  /images:
     delete:
       tags:
         - image
@@ -277,5 +306,19 @@ components:
         img:
           type: string
           format: binary
+        created_at:
+          type: string
+          format: date-time
         people_number:
           type: integer
+
+    ListObjectsInfoResponse:
+      type: object
+      description: Ответ на запрос на получение списка информации об изображениях.
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/GetImageInfoResponse"

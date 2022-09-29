@@ -120,3 +120,51 @@ func (r Repo) DeleteObject(ctx context.Context, objectID uuid.UUID) error {
 	)
 	return err
 }
+
+func (r Repo) ListObjects(ctx context.Context, filter service.ObjectFilter) ([]*service.ImageInfo, error) {
+	// TODO: пока применяется только конкретный фильтр
+	query := `SELECT id, created_at, name, people_number, user_id, extension, size, bucket_name
+	FROM files
+	WHERE deleted_at is null and created_at <= $1
+	ORDER BY created_at desc
+	`
+
+	rows, err := r.tx.QueryContext(ctx, query, *filter.OlderThen)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	objects := []*service.ImageInfo{}
+
+	for rows.Next() {
+		object := &service.ImageInfo{}
+
+		err = rows.Scan(&object.ID, &object.CreatedAt, &object.Name, &object.PeopleNumber, &object.UserID,
+			&object.Extension, &object.Size, &object.BucketName)
+		if err != nil {
+			return nil, err
+		}
+		objects = append(objects, object)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+
+	return objects, nil
+}
+
+func (r Repo) DeleteObjects(ctx context.Context, deleteOlderThen time.Time) error {
+	deleted_at := time.Now()
+	_, err := r.tx.ExecContext(
+		ctx,
+		`UPDATE files
+		SET deleted_at = $1
+		WHERE created_at <= $2
+		`, deleted_at, deleteOlderThen,
+	)
+	return err
+}

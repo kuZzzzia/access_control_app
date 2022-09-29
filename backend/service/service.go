@@ -28,11 +28,20 @@ type ImageInfo struct {
 	UserID     uuid.UUID
 }
 
+type ObjectFilter struct {
+	OlderThen *time.Time
+}
+
 type Repository interface {
 	CreateObject(ctx context.Context, object *ImageInfo) error
+
 	GetObject(ctx context.Context, objectID uuid.UUID) (*ImageInfo, error)
 	GetLastObject(ctx context.Context) (*ImageInfo, error)
+
+	ListObjects(ctx context.Context, filter ObjectFilter) ([]*ImageInfo, error)
+
 	DeleteObject(ctx context.Context, objectID uuid.UUID) error
+	DeleteObjects(ctx context.Context, deleteOlderThen time.Time) error
 }
 
 type ObjectStorage interface {
@@ -134,6 +143,29 @@ func (c *Service) DeleteObject(ctx context.Context, objectID uuid.UUID) error {
 	err = c.store.DeleteObject(ctx, object.BucketName, objectID.String(), minio.RemoveObjectOptions{})
 	if err != nil {
 		return fmt.Errorf("delete object %w", err)
+	}
+
+	return nil
+}
+
+func (c *Service) DeleteObjects(ctx context.Context, deleteOlderThen time.Time) error {
+	objects, err := c.repo.ListObjects(ctx, ObjectFilter{
+		OlderThen: &deleteOlderThen,
+	})
+	if err != nil {
+		return fmt.Errorf("get object info %w", err)
+	}
+
+	err = c.repo.DeleteObjects(ctx, deleteOlderThen)
+	if err != nil {
+		return fmt.Errorf("delete object info %w", err)
+	}
+
+	for i := range objects {
+		err = c.store.DeleteObject(ctx, objects[i].BucketName, objects[i].ID.String(), minio.RemoveObjectOptions{})
+		if err != nil {
+			return fmt.Errorf("delete object %w", err)
+		}
 	}
 
 	return nil
