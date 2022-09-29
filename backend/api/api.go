@@ -88,7 +88,7 @@ func (ctrl *Controller) CreateImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	createdAt := r.FormValue("created_at")
-	createdAtTime, err := time.Parse(createdAt, layout)
+	createdAtTime, err := time.Parse(layout, createdAt)
 	if err != nil {
 		log.Warn().Err(err).Msg("parse created_at")
 		withError(ctx, w, http.StatusBadRequest, "can't parse created_at")
