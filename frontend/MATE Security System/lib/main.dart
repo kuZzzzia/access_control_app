@@ -1,9 +1,10 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:http/http.dart' as http;
 
 void main() {
   runApp(const MyApp());
@@ -41,12 +42,12 @@ class _MyHomePageState extends State<MyHomePage> {
   String elapsedString = "0";
   String status = "ER";
   Color? statusColor = Colors.red[200];
+  Image image = Image.asset('assets/mate_logo.png', width: 360, height: 240);
   final ConnectivityResult connectionStatus = ConnectivityResult.none;
   final Connectivity connectivity = Connectivity();
   late StreamSubscription<ConnectivityResult> connectivitySubscription;
-  late CachedNetworkImage image;
   ConnectivityResult connection = ConnectivityResult.none;
-  int amount = 1;
+  String peopleOnPhoto = "0";
   double width = 370;
   double height = 210;
 
@@ -73,10 +74,26 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
+  Future<String> _getPicture() async {
+    final response = await http.get(Uri.parse('http://82.146.33.179:8000/api/v1/image'));
+    if (response.statusCode == 200) {
+      final octStream = response.body.substring(response.body.indexOf('application/octet-stream') + 28);
+      final imageStream = octStream.substring(0, octStream.indexOf(RegExp(r'--[0-9a-z]*--')));
+      image = Image.memory(Uint8List.fromList(imageStream.codeUnits), width: 360, height: 240);
+      final peopleNumber = response.body.substring(response.body.indexOf('"people_number":') + 16);
+      peopleOnPhoto = peopleNumber.substring(0, peopleNumber.indexOf('}'));
+      //final createdAt = response.body.substring(response.body.indexOf('"created_at":') + 13);
+      //initialTime = DateTime.parse(createdAt.substring(0, createdAt.indexOf(',')));
+      return "OK";
+    } else {
+      throw Exception('Failed to load');
+    }
+  }
+
   void _refreshPicture() {
     setState(() {
+      _getPicture();
         if (connection != ConnectivityResult.none) {
-          amount++;
           status = "OK";
           statusColor = Colors.green[200];
           initialTime = DateTime.now();
@@ -109,7 +126,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                 SizedBox(width: width, height: height, child: const Center(child:CircularProgressIndicator(strokeWidth: 4))),
                           ClipRRect(
                             borderRadius: BorderRadius.circular(20),
-                            child : CachedNetworkImage(imageUrl: 'http://82.146.33.179:8000/api/image/$amount', width: width, height: height),
+                            child : Center(child: image)
                           )])),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -142,7 +159,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                 color: Colors.brown[200],
                                 shape: BoxShape.circle,
                               ),
-                              child: Center(widthFactor: 2.7, heightFactor: 1.4, child: Text(amount.toString(), style: const TextStyle(fontSize: 40))),
+                              child: Center(widthFactor: 2.7, heightFactor: 1.4, child: Text(peopleOnPhoto, style: const TextStyle(fontSize: 40))),
                             )
                         ),
                             ]),
