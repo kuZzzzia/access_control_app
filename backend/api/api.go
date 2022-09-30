@@ -177,6 +177,7 @@ func (ctrl *Controller) CreateImage(w http.ResponseWriter, r *http.Request) {
 func GetImageForResponse(res *service.ImageInfo) *specs.GetImageInfoResponse {
 	return &specs.GetImageInfoResponse{
 		Id:           res.ID.String(),
+		CreatedAt:    res.CreatedAt,
 		PeopleNumber: res.PeopleNumber,
 	}
 }
