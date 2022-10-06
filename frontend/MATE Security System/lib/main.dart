@@ -1,10 +1,12 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:http/http.dart' as http;
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 void main() {
   runApp(const MyApp());
@@ -13,8 +15,39 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+  Future<void> _channelSetUp (AndroidNotificationChannel channel, FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin) async {
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(channel);
+  }
+
+  Future<void> _initFirebase() async {
+    await Firebase.initializeApp();
+  }
+
   @override
   Widget build(BuildContext context) {
+    _initFirebase().then((value) => (){
+      const AndroidNotificationChannel channel = AndroidNotificationChannel(
+        'high_importance_channel', // id
+        'High Importance Notifications', // title
+        importance: Importance.max,
+      );
+
+          final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+          FlutterLocalNotificationsPlugin();
+
+      _channelSetUp(channel, flutterLocalNotificationsPlugin);
+
+      FirebaseMessaging.instance
+          .getInitialMessage()
+          .then((RemoteMessage? message) {
+        if (message != null) {
+          Navigator.pushNamed(context, message.data['view']);
+        }
+      });
+    });
+
     return MaterialApp(
       title: 'MATE Security System',
       theme: ThemeData(
@@ -59,7 +92,6 @@ class _MyHomePageState extends State<MyHomePage> {
           connection = result;
         });
     _refreshPicture();
-    initialTime = DateTime.now();
     timer = Timer.periodic(const Duration(minutes: 1), (_)
     {
       final now = DateTime.now();
@@ -82,8 +114,8 @@ class _MyHomePageState extends State<MyHomePage> {
       image = Image.memory(Uint8List.fromList(imageStream.codeUnits), width: 360, height: 240);
       final peopleNumber = response.body.substring(response.body.indexOf('"people_number":') + 16);
       peopleOnPhoto = peopleNumber.substring(0, peopleNumber.indexOf('}'));
-      //final createdAt = response.body.substring(response.body.indexOf('"created_at":') + 13);
-      //initialTime = DateTime.parse(createdAt.substring(0, createdAt.indexOf(',')));
+      final createdAt = response.body.substring(response.body.indexOf('"created_at":') + 14);
+      initialTime = DateTime.parse(createdAt.substring(0, createdAt.indexOf(',') - 1));
       return "OK";
     } else {
       throw Exception('Failed to load');
@@ -96,9 +128,12 @@ class _MyHomePageState extends State<MyHomePage> {
         if (connection != ConnectivityResult.none) {
           status = "OK";
           statusColor = Colors.green[200];
-          initialTime = DateTime.now();
-          elapsed = Duration.zero;
-          elapsedString = "0";
+          elapsed = DateTime.now().difference(initialTime);
+          if (elapsed.inMinutes > 60) {
+            elapsedString = ">60";
+          } else {
+            elapsedString = elapsed.inMinutes.toString();
+          }
         } else {
           status = "ER";
           statusColor = Colors.red[200];
