@@ -6,6 +6,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:http/http.dart' as http;
 import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 void main() {
@@ -22,7 +23,9 @@ class MyApp extends StatelessWidget {
   }
 
   Future<void> _initFirebase() async {
-    await Firebase.initializeApp();
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
   }
 
   @override
@@ -86,12 +89,13 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   void initState() {
+    initialTime = DateTime.now();
+    _refreshPicture();
     super.initState();
     connectivitySubscription =
         connectivity.onConnectivityChanged.listen((ConnectivityResult result) {
           connection = result;
         });
-    _refreshPicture();
     timer = Timer.periodic(const Duration(minutes: 1), (_)
     {
       final now = DateTime.now();
