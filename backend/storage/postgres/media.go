@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -135,7 +136,7 @@ func addUserFilters(q *sqb.SelectStmt, filters service.ObjectFilter, isCount boo
 
 	if !isCount {
 		if len(filters.Pagination.OrderBy) == 0 {
-			filters.Pagination.AddOrderByDesc(`a.created_at`)
+			filters.Pagination.AddOrderByDesc(`f.created_at`)
 		}
 		query = *filters.Pagination.Apply(&query)
 	}
@@ -147,12 +148,14 @@ func (r *Repo) countObjects(ctx context.Context, filters service.ObjectFilter) (
 	query := sqb.From(sqb.TableName(`files`).As(`f`)).
 		Select(sqb.Count(sqb.Column(`f.id`)))
 
-	query = *addUserFilters(&query, filters, false)
+	query = *addUserFilters(&query, filters, true)
 
 	rawquery, args, err := sqb.ToPostgreSql(query)
 	if err != nil {
 		return 0, err
 	}
+
+	fmt.Println(rawquery)
 
 	return count(ctx, r.tx, rawquery, args)
 }
@@ -160,13 +163,15 @@ func (r *Repo) countObjects(ctx context.Context, filters service.ObjectFilter) (
 func (r Repo) ListObjects(ctx context.Context, filter service.ObjectFilter) ([]*service.ImageInfo, int, error) {
 	total, err := r.countObjects(ctx, filter)
 	if err != nil || total == 0 {
-		return nil, 0, nil
+		return nil, 0, err
 	}
 
 	query := sqb.From(sqb.TableName(`files`).As(`f`)).
 		Select(sqb.Column(`f.id`), sqb.Column(`f.created_at`), sqb.Column(`f.name`),
 			sqb.Column(`f.people_number`), sqb.Column(`f.user_id`),
 			sqb.Column(`f.extension`), sqb.Column(`f.size`), sqb.Column(`f.bucket_name`))
+
+	query = *addUserFilters(&query, filter, false)
 
 	q, args, err := sqb.ToPostgreSql(query)
 	if err != nil {

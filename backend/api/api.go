@@ -22,6 +22,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"go.opencensus.io/trace"
 
+	"github.com/kuZzzzia/access_control_app/backend/pagination"
 	"github.com/kuZzzzia/access_control_app/backend/service"
 	"github.com/kuZzzzia/access_control_app/backend/specs"
 	"github.com/kuZzzzia/access_control_app/backend/storage/postgres"
@@ -447,15 +448,34 @@ func (ctrl *Controller) DeleteOldImages(w http.ResponseWriter, r *http.Request, 
 	return
 }
 
+func GetApplicationPaginationPolitics() pagination.PaginationPolitics {
+	return pagination.PaginationPolitics{
+		MaxLimit:     50,
+		DefaultLimit: 25,
+		OrderByMappgin: map[string]string{
+			"date_created": "date_created",
+			"status":       "status",
+		},
+	}
+}
+
 func (ctrl *Controller) ListObjectInfo(w http.ResponseWriter, r *http.Request, params specs.ListObjectInfoParams) {
 	ctx := r.Context()
 
-	filter := service.ObjectFilter{}
+	pgnPolitics, err := GetApplicationPaginationPolitics().MakePagination(params.Pagination, params.Sort)
+	if err != nil {
+		withError(ctx, w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	filter := service.ObjectFilter{
+		Pagination: pgnPolitics,
+	}
 
 	list, total, err := ctrl.srv.ListObjectInfo(ctx, filter)
 	if err != nil {
 		log.Error().Err(err).Msg("ListObjectInfo")
-		w.WriteHeader(http.StatusInternalServerError)
+		withError(ctx, w, http.StatusInternalServerError, "")
 		return
 	}
 
