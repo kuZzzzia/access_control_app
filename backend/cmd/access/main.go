@@ -14,6 +14,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	firebase "firebase.google.com/go"
 	"github.com/alecthomas/units"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v4/stdlib"
@@ -23,6 +24,7 @@ import (
 	"github.com/kuZzzzia/access_control_app/backend/storage/postgres"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"google.golang.org/api/option"
 	"gopkg.in/yaml.v3"
 
 	"github.com/rs/zerolog/log"
@@ -81,6 +83,12 @@ func main() {
 		log.Fatal().Err(errMinio).Str("address", cfg.Minio.Address).Msg("create minioClient")
 	}
 
+	opt := option.WithCredentialsFile("key.json")
+	app, err := firebase.NewApp(context.Background(), nil, opt)
+	if err != nil {
+		log.Fatal().Err(err).Msg("error initializing app")
+	}
+
 	repo := postgres.NewRepository(db)
 
 	apiServer := api.NewController(
@@ -92,7 +100,8 @@ func main() {
 				Bucket: cfg.Minio.BucketID,
 			},
 		),
-		repo, cfg.DenyTypes, limit)
+		repo, cfg.DenyTypes, limit,
+		app)
 
 	group := errgroup.Group{}
 
@@ -133,6 +142,7 @@ func StartHTTP(ctx context.Context, ctrl *api.Controller, cfg *Config) error {
 	// }
 
 	router.Handle("/", specs.HandlerFromMuxWithBaseURL(ctrl, router, cfg.BasePath))
+	router.HandleFunc("/ping", ctrl.Ping)
 
 	srv := http.Server{
 		Addr:    cfg.Address,

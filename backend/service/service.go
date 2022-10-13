@@ -9,6 +9,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
+
+	"github.com/kuZzzzia/access_control_app/backend/pagination"
 )
 
 var ErrorObjectNotFound = errors.New("object not found")
@@ -30,6 +32,8 @@ type ImageInfo struct {
 
 type ObjectFilter struct {
 	OlderThen *time.Time
+
+	Pagination pagination.Pagination
 }
 
 type Repository interface {
@@ -38,7 +42,7 @@ type Repository interface {
 	GetObject(ctx context.Context, objectID uuid.UUID) (*ImageInfo, error)
 	GetLastObject(ctx context.Context) (*ImageInfo, error)
 
-	ListObjects(ctx context.Context, filter ObjectFilter) ([]*ImageInfo, error)
+	ListObjects(ctx context.Context, filter ObjectFilter) ([]*ImageInfo, int, error)
 
 	DeleteObject(ctx context.Context, objectID uuid.UUID) error
 	DeleteObjects(ctx context.Context, deleteOlderThen time.Time) error
@@ -148,25 +152,29 @@ func (c *Service) DeleteObject(ctx context.Context, objectID uuid.UUID) error {
 	return nil
 }
 
-func (c *Service) DeleteObjects(ctx context.Context, deleteOlderThen time.Time) error {
-	objects, err := c.repo.ListObjects(ctx, ObjectFilter{
+func (srv *Service) DeleteObjects(ctx context.Context, deleteOlderThen time.Time) error {
+	objects, _, err := srv.repo.ListObjects(ctx, ObjectFilter{
 		OlderThen: &deleteOlderThen,
 	})
 	if err != nil {
 		return fmt.Errorf("get object info %w", err)
 	}
 
-	err = c.repo.DeleteObjects(ctx, deleteOlderThen)
+	err = srv.repo.DeleteObjects(ctx, deleteOlderThen)
 	if err != nil {
 		return fmt.Errorf("delete object info %w", err)
 	}
 
 	for i := range objects {
-		err = c.store.DeleteObject(ctx, objects[i].BucketName, objects[i].ID.String(), minio.RemoveObjectOptions{})
+		err = srv.store.DeleteObject(ctx, objects[i].BucketName, objects[i].ID.String(), minio.RemoveObjectOptions{})
 		if err != nil {
 			return fmt.Errorf("delete object %w", err)
 		}
 	}
 
 	return nil
+}
+
+func (srv *Service) ListObjectInfo(ctx context.Context, filter ObjectFilter) ([]*ImageInfo, int, error) {
+	return srv.repo.ListObjects(ctx, filter)
 }

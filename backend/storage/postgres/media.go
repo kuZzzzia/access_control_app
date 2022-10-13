@@ -2,10 +2,13 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/kuZzzzia/access_control_app/backend/service"
+	"github.com/vagruchi/sqb"
 )
 
 type Repo struct {
@@ -121,17 +124,58 @@ func (r Repo) DeleteObject(ctx context.Context, objectID uuid.UUID) error {
 	return err
 }
 
-func (r Repo) ListObjects(ctx context.Context, filter service.ObjectFilter) ([]*service.ImageInfo, error) {
-	// TODO: пока применяется только конкретный фильтр
-	query := `SELECT id, created_at, name, people_number, user_id, extension, size, bucket_name
-	FROM files
-	WHERE deleted_at is null and created_at <= $1
-	ORDER BY created_at desc
-	`
+func addUserFilters(q *sqb.SelectStmt, filters service.ObjectFilter, isCount bool) *sqb.SelectStmt {
+	query := *q
 
-	rows, err := r.tx.QueryContext(ctx, query, *filter.OlderThen)
+	query = query.Where(append(query.WhereStmt.Exprs, sqb.Raw(`f.deleted_at IS NULL`))...)
+
+	if filters.OlderThen != nil {
+		query = query.Where(append(query.WhereStmt.Exprs, sqb.BinaryOp(sqb.Column(`f.created_at`), "<=", sqb.Arg{V: *filters.OlderThen}))...)
+	}
+
+	if !isCount {
+		if len(filters.Pagination.OrderBy) == 0 {
+			filters.Pagination.AddOrderByDesc(`a.created_at`)
+		}
+		query = *filters.Pagination.Apply(&query)
+	}
+
+	return &query
+}
+
+func (r *Repo) countObjects(ctx context.Context, filters service.ObjectFilter) (int, error) {
+	query := sqb.From(sqb.TableName(`files`).As(`f`)).
+		Select(sqb.Count(sqb.Column(`f.id`)))
+
+	query = *addUserFilters(&query, filters, false)
+
+	rawquery, args, err := sqb.ToPostgreSql(query)
 	if err != nil {
-		return nil, err
+		return 0, err
+	}
+
+	return count(ctx, r.tx, rawquery, args)
+}
+
+func (r Repo) ListObjects(ctx context.Context, filter service.ObjectFilter) ([]*service.ImageInfo, int, error) {
+	total, err := r.countObjects(ctx, filter)
+	if err != nil || total == 0 {
+		return nil, 0, nil
+	}
+
+	query := sqb.From(sqb.TableName(`files`).As(`f`)).
+		Select(sqb.Column(`f.id`), sqb.Column(`f.created_at`), sqb.Column(`f.name`),
+			sqb.Column(`f.people_number`), sqb.Column(`f.user_id`),
+			sqb.Column(`f.extension`), sqb.Column(`f.size`), sqb.Column(`f.bucket_name`))
+
+	q, args, err := sqb.ToPostgreSql(query)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := r.tx.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, 0, err
 	}
 
 	defer rows.Close()
@@ -144,17 +188,17 @@ func (r Repo) ListObjects(ctx context.Context, filter service.ObjectFilter) ([]*
 		err = rows.Scan(&object.ID, &object.CreatedAt, &object.Name, &object.PeopleNumber, &object.UserID,
 			&object.Extension, &object.Size, &object.BucketName)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		objects = append(objects, object)
 	}
 
 	err = rows.Err()
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return objects, nil
+	return objects, 0, nil
 }
 
 func (r Repo) DeleteObjects(ctx context.Context, deleteOlderThen time.Time) error {
@@ -167,4 +211,18 @@ func (r Repo) DeleteObjects(ctx context.Context, deleteOlderThen time.Time) erro
 		`, deleted_at, deleteOlderThen,
 	)
 	return err
+}
+
+func count(ctx context.Context, tx QueryerContext, query string, args []interface{}) (int, error) {
+	total := sql.NullInt32{}
+
+	err := tx.QueryRowContext(ctx, query, args...).Scan(&total)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, nil
+		}
+		return 0, err
+	}
+
+	return int(total.Int32), nil
 }

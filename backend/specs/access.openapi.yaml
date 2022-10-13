@@ -9,10 +9,12 @@ info:
 servers:
   - url: https://127.0.0.1:8000/api/v1
     description: development server
+  - url: ws://127.0.0.1:8000/api/v1/people_number
 
 tags:
   - name: image
     description: Операции для работы с изображениями.
+  - name: websocket
 
 paths:
   /image:
@@ -193,6 +195,9 @@ paths:
 
   /images/info:
     get:
+      parameters:
+        - $ref: "#/components/parameters/pagination"
+        - $ref: "#/components/parameters/sort"
       tags:
         - image
       operationId: listObjectInfo
@@ -256,6 +261,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /people_number:
+    get:
+      tags:
+        - websocket
+      responses:
+         "200":
+            description: success
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/GetPeopleNumberResponse"
+
+
 components:
   schemas:
     Error:
@@ -270,6 +288,15 @@ components:
           type: string
         details:
           type: string
+
+    ResponseMetaTotal:
+      description: Полное количество элементов, попадающих под параметра запроса.
+      type: object
+      required:
+        - total
+      properties:
+        total:
+          type: integer
 
     GetImageInfoResponse:
       type: object
@@ -322,3 +349,62 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/GetImageInfoResponse"
+        meta:
+            $ref: "#/components/schemas/ResponseMetaTotal"
+
+    GetPeopleNumberResponse:
+      type: object
+      required:
+        - people_number
+      properties:
+        people_number:
+          type: integer
+
+  parameters:
+    # Пагинация
+    pagination:
+      name: pagination
+      in: query
+      required: false
+      explode: true
+      style: deepObject
+      schema:
+        type: object
+        required:
+          - limit
+          - offset
+        properties:
+          limit:
+            description: Количество элементов на странице.
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 25
+          offset:
+            description: Количество элементов, которые нужно пропустить от начала списка.
+            type: integer
+            minimum: 0
+            default: 0
+
+    # Сортировка
+    sort:
+      name: sort
+      in: query
+      required: false
+      explode: true
+      style: deepObject
+      schema:
+        type: object
+        required:
+          - sortOrder
+          - sortKey
+        properties:
+          sortOrder:
+            description: Возможные значения порядка сортировки.
+            type: string
+            enum:
+              - asc
+              - desc
+          sortKey:
+            description: Свойство, по которому нужно сортировать массив.
+            type: string

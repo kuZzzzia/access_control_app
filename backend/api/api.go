@@ -12,8 +12,11 @@ import (
 	"time"
 
 	"net/http"
+	"net/url"
 
+	firebase "firebase.google.com/go"
 	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 	"github.com/minio/minio-go/v7"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -30,17 +33,35 @@ type Controller struct {
 
 	DenyTypes map[string]string
 	SizeLimit int64
+
+	clients map[*websocket.Conn]bool
+
+	lastPeopleNumber         int
+	peopleNumberNotification chan int
+
+	HTTPClient http.Client
+
+	FireBaseUrl   *url.URL
+	FirebaseToken string
+	App           *firebase.App
 }
 
 func NewController(srv *service.Service,
 	repo *postgres.Repo,
 	denyTypes map[string]string,
-	sizeLimit int64) *Controller {
+	sizeLimit int64, app *firebase.App) *Controller {
+
 	return &Controller{
 		srv:       srv,
 		repo:      repo,
 		DenyTypes: denyTypes,
 		SizeLimit: sizeLimit,
+
+		HTTPClient: http.Client{},
+
+		clients:                  make(map[*websocket.Conn]bool),
+		peopleNumberNotification: make(chan int, 2),
+		App:                      app,
 	}
 }
 
@@ -163,6 +184,14 @@ func (ctrl *Controller) CreateImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	shouldRollback = false
+
+	go func() {
+		if ctrl.lastPeopleNumber != object.PeopleNumber && object.PeopleNumber != 0 {
+			ctrl.lastPeopleNumber = object.PeopleNumber
+			ctrl.peopleNumberNotification <- object.PeopleNumber
+			ctrl.PushPeopleNumber(context.Background(), object.PeopleNumber)
+		}
+	}()
 
 	res, err := ctrl.srv.GetObjectInfo(ctx, object.ID)
 	if err != nil {
@@ -331,11 +360,10 @@ func (ctrl *Controller) DeleteImage(w http.ResponseWriter, r *http.Request, imag
 
 	span := trace.FromContext(ctx)
 	defer span.End()
-	entry := zerolog.Ctx(ctx)
 
 	objectID, err := uuid.Parse(imageId)
 	if err != nil {
-		entry.Warn().Err(err).Msg("invalid uuid")
+		log.Warn().Err(err).Msg("invalid uuid")
 		withError(ctx, w, http.StatusBadRequest, "invalid image id")
 		return
 	}
@@ -353,7 +381,7 @@ func (ctrl *Controller) DeleteImage(w http.ResponseWriter, r *http.Request, imag
 
 	err = objectService.DeleteObject(ctx, objectID)
 	if err != nil {
-		entry.Error().Err(err).Msg("get object")
+		log.Error().Err(err).Msg("get object")
 		switch {
 		case errors.As(err, &service.ErrorObjectNotFound):
 			withError(ctx, w, http.StatusNotFound, "object not found")
@@ -419,8 +447,30 @@ func (ctrl *Controller) DeleteOldImages(w http.ResponseWriter, r *http.Request, 
 	return
 }
 
-func (ctrl *Controller) ListObjectInfo(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
+func (ctrl *Controller) ListObjectInfo(w http.ResponseWriter, r *http.Request, params specs.ListObjectInfoParams) {
+	ctx := r.Context()
+
+	filter := service.ObjectFilter{}
+
+	list, total, err := ctrl.srv.ListObjectInfo(ctx, filter)
+	if err != nil {
+		log.Error().Err(err).Msg("ListObjectInfo")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	response := specs.ListObjectsInfoResponse{
+		Data: arrayInArray(list, func(in *service.ImageInfo) specs.GetImageInfoResponse {
+			out := GetImageForResponse(in)
+			return *out
+		}),
+		Meta: &specs.ResponseMetaTotal{
+			Total: total,
+		},
+	}
+
+	withJSON(ctx, w, http.StatusOK, response)
+	return
 }
 
 func withError(ctx context.Context, w http.ResponseWriter, code int, message string) {
@@ -442,4 +492,18 @@ func withJSON(ctx context.Context, w http.ResponseWriter, code int, payload inte
 			zerolog.Ctx(ctx).Error().Err(err).Msg("write answer")
 		}
 	}
+}
+
+func arrayInArray[T any, R any](in []T, f func(T) R) []R {
+	if len(in) == 0 {
+		return []R{}
+	}
+
+	out := make([]R, len(in))
+
+	for i := range in {
+		out[i] = f(in[i])
+	}
+
+	return out
 }

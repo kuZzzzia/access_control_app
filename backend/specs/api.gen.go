@@ -41,9 +41,40 @@ type GetImageResponse struct {
 	Info *GetImageInfoResponse `json:"info,omitempty"`
 }
 
+// GetPeopleNumberResponse defines model for GetPeopleNumberResponse.
+type GetPeopleNumberResponse struct {
+	PeopleNumber int `json:"people_number"`
+}
+
 // Ответ на запрос на получение списка информации об изображениях.
 type ListObjectsInfoResponse struct {
 	Data []GetImageInfoResponse `json:"data"`
+
+	// Полное количество элементов, попадающих под параметра запроса.
+	Meta *ResponseMetaTotal `json:"meta,omitempty"`
+}
+
+// Полное количество элементов, попадающих под параметра запроса.
+type ResponseMetaTotal struct {
+	Total int `json:"total"`
+}
+
+// Pagination defines model for pagination.
+type Pagination struct {
+	// Количество элементов на странице.
+	Limit int `json:"limit"`
+
+	// Количество элементов, которые нужно пропустить от начала списка.
+	Offset int `json:"offset"`
+}
+
+// Sort defines model for sort.
+type Sort struct {
+	// Свойство, по которому нужно сортировать массив.
+	SortKey string `json:"sortKey"`
+
+	// Возможные значения порядка сортировки.
+	SortOrder string `json:"sortOrder"`
 }
 
 // DeleteOldImagesParams defines parameters for DeleteOldImages.
@@ -51,6 +82,15 @@ type DeleteOldImagesParams struct {
 	// Дата создания, до которой нужно удалить изображения.
 	CreatedAt time.Time `json:"created_at"`
 }
+
+// ListObjectInfoParams defines parameters for ListObjectInfo.
+type ListObjectInfoParams struct {
+	Pagination *Pagination `json:"pagination,omitempty"`
+	Sort       *Sort       `json:"sort,omitempty"`
+}
+
+// ListObjectInfoParamsSortSortOrder defines parameters for ListObjectInfo.
+type ListObjectInfoParamsSortSortOrder string
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -74,7 +114,10 @@ type ServerInterface interface {
 	DeleteOldImages(w http.ResponseWriter, r *http.Request, params DeleteOldImagesParams)
 	// Получение списка информации об изображениях.
 	// (GET /images/info)
-	ListObjectInfo(w http.ResponseWriter, r *http.Request)
+	ListObjectInfo(w http.ResponseWriter, r *http.Request, params ListObjectInfoParams)
+
+	// (GET /people_number)
+	GetPeopleNumber(w http.ResponseWriter, r *http.Request)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -232,8 +275,50 @@ func (siw *ServerInterfaceWrapper) DeleteOldImages(w http.ResponseWriter, r *htt
 func (siw *ServerInterfaceWrapper) ListObjectInfo(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListObjectInfoParams
+
+	// ------------- Optional query parameter "pagination" -------------
+	if paramValue := r.URL.Query().Get("pagination"); paramValue != "" {
+
+	}
+
+	err = runtime.BindQueryParameter("deepObject", true, false, "pagination", r.URL.Query(), &params.Pagination)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "pagination", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+	if paramValue := r.URL.Query().Get("sort"); paramValue != "" {
+
+	}
+
+	err = runtime.BindQueryParameter("deepObject", true, false, "sort", r.URL.Query(), &params.Sort)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
+		return
+	}
+
 	var handler = func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListObjectInfo(w, r)
+		siw.Handler.ListObjectInfo(w, r, params)
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler(w, r.WithContext(ctx))
+}
+
+// GetPeopleNumber operation middleware
+func (siw *ServerInterfaceWrapper) GetPeopleNumber(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var handler = func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPeopleNumber(w, r)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -376,6 +461,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/images/info", wrapper.ListObjectInfo)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/people_number", wrapper.GetPeopleNumber)
 	})
 
 	return r
