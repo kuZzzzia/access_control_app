@@ -61,13 +61,9 @@ func (ctrl *Controller) GetPeopleNumber(w http.ResponseWriter, r *http.Request) 
 		}
 		messageHandler(message)
 		select {
-		case peopleNumber := <-ctrl.peopleNumberNotification:
-			log.Debug().Msg("needNotification")
-			ctrl.writeMessage(peopleNumber)
-			// if err != nil {
-			// 	log.Error().Err(err).Msg("write close:", err)
-			// 	return
-			// }
+		// case peopleNumber := <-ctrl.peopleNumberNotification:
+		// 	log.Debug().Msg("needNotification")
+		// 	ctrl.writeMessage(peopleNumber)
 		}
 	}
 }
@@ -89,58 +85,48 @@ func messageHandler(message []byte) {
 	fmt.Println(string(message))
 }
 
-func (ctrl *Controller) PushPeopleNumber(ctx context.Context, peopleNumber int) {
-	client, err := ctrl.App.Messaging(ctx)
+func (ctrl *Controller) Auth(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 
-	anwswer, err := client.Send(ctx, &messaging.Message{
-		Topic: "Notification",
-		Notification: &messaging.Notification{
-			Title: "People Number",
-			Body:  strconv.Itoa(peopleNumber),
-		},
-	})
+	firebaseToken := r.Header.Get("firebaseToken")
+
+	err := ctrl.srv.AddNotificationToken(ctx, firebaseToken)
 	if err != nil {
-		log.Error().Err(err).Msg("Marshal")
+
+		log.Error().Err(err).Msg("failed to add notification token")
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (ctrl *Controller) PushPeopleNumber(ctx context.Context, peopleNumber int) {
+	tokens, err := ctrl.srv.ListNotificationTokens(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("ListNotificationTokens")
 		return
 	}
-	log.Debug().Str("anwswer", anwswer).Msg("client.Send")
 
-	// reqUrl := *ctrl.FireBaseUrl
-	// reqUrl, err := url.Parse("https://fcm.googleapis.com/v1/projects/access-control-app-986f4/messages:send")
+	client, err := ctrl.App.Messaging(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("Messaging")
+		return
+	}
 
-	// body, err := json.Marshal(FireBaseRequest{
-	// 	Message: Message{
-	// 		Notification: Notification{
-	// 			Title: "People Number",
-	// 			Body:  strconv.Itoa(peopleNumber),
-	// 		},
-	// 	},
-	// })
-	// if err != nil {
-	// 	log.Error().Err(err).Msg("Marshal")
-	// 	return
-	// }
-
-	// req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqUrl.String(), bytes.NewReader(body))
-	// if err != nil {
-	// 	log.Error().Err(err).Msg("NewRequestWithContext")
-	// 	return
-	// }
-
-	// req.Header.Set("Authorization", "Bearer AIzaSyD8jIew6NOCmiLe7wCFeBpe-KgY3aQ2zAM")
-	// req.Header.Set("Content-Type", "application/json")
-
-	// resp, err := ctrl.HTTPClient.Do(req)
-	// if err != nil {
-	// 	log.Error().Err(err).Msg("do")
-	// 	return
-	// }
-	// defer resp.Body.Close()
-
-	// if resp.StatusCode != http.StatusNoContent {
-	// 	log.Error().Err(errors.New(resp.Status)).Msg("status code")
-	// 	return
-	// }
+	for i := range tokens {
+		anwswer, err := client.Send(ctx, &messaging.Message{
+			Token: tokens[i],
+			Topic: "Notification",
+			Notification: &messaging.Notification{
+				Title: "People Number",
+				Body:  strconv.Itoa(peopleNumber),
+			},
+		})
+		if err != nil {
+			log.Error().Err(err).Msg("Send")
+			continue
+		}
+		log.Debug().Str("anwswer", anwswer).Msg("client.Send")
+	}
 }
 
 type Notification struct {
@@ -155,14 +141,4 @@ type Message struct {
 
 type FireBaseRequest struct {
 	Message `json:"message"`
-	// {
-	// 	"message":{
-	// 	   "token":"token_1",
-	// 	   "data":{},
-	// 	   "notification":{
-	// 		 "title":"People Number",
-	// 		 "body":"6",
-	// 	   }
-	// 	}
-	//  }
 }

@@ -202,22 +202,21 @@ paths:
         - image
       operationId: listObjectInfo
       summary: Получение списка информации об изображениях.
-      # TODO: Not Implemented, неплохо бы добавить пагинацию
       description: Получение списка информации об изображениях.
       responses:
-        '200':
+        "200":
           description: Успешный ответ.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ListObjectsInfoResponse"
-        '500':
+        "500":
           description: internal server error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-        '401':
+        "401":
           description: not authorized
           content:
             application/json:
@@ -266,13 +265,21 @@ paths:
       tags:
         - websocket
       responses:
-         "200":
-            description: success
-            content:
-              application/json:
-                schema:
-                  $ref: "#/components/schemas/GetPeopleNumberResponse"
+        "200":
+          description: success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetPeopleNumberResponse"
 
+  /auth:
+    post:
+      tags:
+        - auth
+      operationId: auth
+      responses:
+        "200":
+          description: success
 
 components:
   schemas:
@@ -350,7 +357,7 @@ components:
           items:
             $ref: "#/components/schemas/GetImageInfoResponse"
         meta:
-            $ref: "#/components/schemas/ResponseMetaTotal"
+          $ref: "#/components/schemas/ResponseMetaTotal"
 
     GetPeopleNumberResponse:
       type: object

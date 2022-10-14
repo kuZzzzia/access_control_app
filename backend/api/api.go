@@ -37,8 +37,8 @@ type Controller struct {
 
 	clients map[*websocket.Conn]bool
 
-	lastPeopleNumber         int
-	peopleNumberNotification chan int
+	lastPeopleNumber int
+	// peopleNumberNotification chan int
 
 	HTTPClient http.Client
 
@@ -60,9 +60,9 @@ func NewController(srv *service.Service,
 
 		HTTPClient: http.Client{},
 
-		clients:                  make(map[*websocket.Conn]bool),
-		peopleNumberNotification: make(chan int, 2),
-		App:                      app,
+		clients: make(map[*websocket.Conn]bool),
+		// peopleNumberNotification: make(chan int, 2),
+		App: app,
 	}
 }
 
@@ -189,7 +189,7 @@ func (ctrl *Controller) CreateImage(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		if ctrl.lastPeopleNumber != object.PeopleNumber && object.PeopleNumber != 0 {
 			ctrl.lastPeopleNumber = object.PeopleNumber
-			ctrl.peopleNumberNotification <- object.PeopleNumber
+			// ctrl.peopleNumberNotification <- object.PeopleNumber
 			ctrl.PushPeopleNumber(context.Background(), object.PeopleNumber)
 		}
 	}()

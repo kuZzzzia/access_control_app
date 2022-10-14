@@ -94,6 +94,9 @@ type ListObjectInfoParamsSortSortOrder string
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+
+	// (POST /auth)
+	Auth(w http.ResponseWriter, r *http.Request)
 	// Получение последнего изображения.
 	// (GET /image)
 	GetLastImage(w http.ResponseWriter, r *http.Request)
@@ -128,6 +131,21 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.HandlerFunc) http.HandlerFunc
+
+// Auth operation middleware
+func (siw *ServerInterfaceWrapper) Auth(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var handler = func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Auth(w, r)
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler(w, r.WithContext(ctx))
+}
 
 // GetLastImage operation middleware
 func (siw *ServerInterfaceWrapper) GetLastImage(w http.ResponseWriter, r *http.Request) {
@@ -441,6 +459,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth", wrapper.Auth)
+	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/image", wrapper.GetLastImage)
 	})

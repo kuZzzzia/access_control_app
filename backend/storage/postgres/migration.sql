@@ -14,3 +14,12 @@ create table files
     size          integer                                            not null,
     people_number integer                                            not null
 );
+
+create table tokens
+(
+    id            uuid                                               not null
+        constraint files_pkey
+            primary key,
+    created_at    timestamp with time zone default CURRENT_TIMESTAMP not null,
+    token         varchar                                            not null
+);

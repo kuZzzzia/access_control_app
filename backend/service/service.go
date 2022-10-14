@@ -46,6 +46,9 @@ type Repository interface {
 
 	DeleteObject(ctx context.Context, objectID uuid.UUID) error
 	DeleteObjects(ctx context.Context, deleteOlderThen time.Time) error
+
+	AddNotificationToken(ctx context.Context, firebaseToken string) error
+	ListNotificationTokens(ctx context.Context) ([]string, error)
 }
 
 type ObjectStorage interface {
@@ -177,4 +180,12 @@ func (srv *Service) DeleteObjects(ctx context.Context, deleteOlderThen time.Time
 
 func (srv *Service) ListObjectInfo(ctx context.Context, filter ObjectFilter) ([]*ImageInfo, int, error) {
 	return srv.repo.ListObjects(ctx, filter)
+}
+
+func (srv *Service) AddNotificationToken(ctx context.Context, firebaseToken string) error {
+	return srv.repo.AddNotificationToken(ctx, firebaseToken)
+}
+
+func (srv *Service) ListNotificationTokens(ctx context.Context) ([]string, error) {
+	return srv.repo.ListNotificationTokens(ctx)
 }
